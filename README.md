@@ -55,6 +55,7 @@ FC="$(find "$(brew --prefix gcc)/bin" -name 'gfortran-*' | head -n 1)"
 
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   -DCMAKE_OSX_ARCHITECTURES=x86_64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0 \
   -DCMAKE_PREFIX_PATH="$QT_PREFIX/lib/cmake;$OPENSSL_PREFIX;$ZSTD_PREFIX;$BOOST_PREFIX" \
