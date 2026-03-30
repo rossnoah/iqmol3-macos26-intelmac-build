@@ -1,20 +1,36 @@
 #! /bin/bash
 
+set -euo pipefail
+
 #
 #  Complete process for building a statically linked ffmpeg binary
 #
 
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-   # Linux
-   export CC=gcc
-   export CXX=g++
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-   export CC=/opt/homebrew/bin/gcc-13
-   export CXX=/opt/homebrew/bin/g++-13
-elif [[ "$OSTYPE" == "msys" ]]; then
-   # Windows, this script meeds to be run in a MSYS2 MINGW64 shell
-   export CC=gcc
-   export CXX=g++
+if [[ -z "${CC:-}" ]]; then
+   if [[ "$OSTYPE" == "darwin"* ]]; then
+      export CC=clang
+   else
+      export CC=gcc
+   fi
+fi
+
+if [[ -z "${CXX:-}" ]]; then
+   if [[ "$OSTYPE" == "darwin"* ]]; then
+      export CXX=clang++
+   else
+      export CXX=g++
+   fi
+fi
+
+ARCH_FLAGS=""
+if [[ "$OSTYPE" == "darwin"* && "$(uname -m)" == "x86_64" ]]; then
+   ARCH_FLAGS="-arch x86_64"
+fi
+
+if [[ -n "$ARCH_FLAGS" ]]; then
+   export CFLAGS="${CFLAGS:-} $ARCH_FLAGS"
+   export CXXFLAGS="${CXXFLAGS:-} $ARCH_FLAGS"
+   export LDFLAGS="${LDFLAGS:-} $ARCH_FLAGS"
 fi
 
 
@@ -84,7 +100,7 @@ build_ffmpeg()
                --enable-filter=scale --enable-libx264 --disable-xlib --disable-iconv \
                --enable-decoder=png --enable-demuxer=png
    make -j$(sysctl -n hw.ncpu) install
-   cd $cdw
+   cd $cwd
 }
 
 

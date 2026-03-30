@@ -1,10 +1,46 @@
 #!/bin/bash
 
-# Following environment variables must be defined:
-QT_FRAMEWORK_PATH=/opt/homebrew/Cellar/qt\@5/5.15.13_1/lib
-QT_BIN_PATH=/opt/homebrew/Cellar/qt\@5/5.15.13_1/bin
+set -euo pipefail
+
 CERTIFICATE="Developer ID Application: Andrew Gilbert (${APPLE_DEV_TEAM_ID})"
 FRAMEWORKS="QtCore QtGui QtNetwork QtOpenGL QtSql QtWidgets QtXml QtPrintSupport"
+
+find_brew_prefix()
+{
+   local formula=$1
+   if command -v brew >/dev/null 2>&1; then
+      brew --prefix "$formula" 2>/dev/null || true
+   fi
+}
+
+resolve_qt_prefix()
+{
+   if [[ -n "${QT_PREFIX:-}" ]]; then
+      echo "$QT_PREFIX"
+      return
+   fi
+
+   if [[ -n "${IQMOL_QT_ROOT:-}" ]]; then
+      echo "$IQMOL_QT_ROOT"
+      return
+   fi
+
+   local brew_qt
+   brew_qt=$(find_brew_prefix qt@5)
+   if [[ -n "$brew_qt" ]]; then
+      echo "$brew_qt"
+      return
+   fi
+}
+
+QT_PREFIX=$(resolve_qt_prefix)
+if [[ -z "$QT_PREFIX" ]]; then
+   echo "Could not find a Qt 5 installation. Set QT_PREFIX or IQMOL_QT_ROOT."
+   exit 1
+fi
+
+QT_FRAMEWORK_PATH="${QT_PREFIX}/lib"
+QT_BIN_PATH="${QT_PREFIX}/bin"
 
 
 # retrieve bundle name from first parameter
@@ -118,7 +154,13 @@ for CURRENT_FRAMEWORK in ${BAD_FRAMEWORKS}; do
 done
 
 echo "Copying libgcc to Framework directory"
-cp  /opt/local/lib/libgcc/libgcc_s.1.1.dylib $BUNDLE_NAME/Contents/Frameworks/
+LIBGCC_PATH=$(otool -L "$BUNDLE_NAME/Contents/MacOS/IQmol" | awk '/libgcc_s/{print $1; exit}')
+if [[ -z "$LIBGCC_PATH" && -f "$BUNDLE_NAME/Contents/MacOS/ffmpeg" ]]; then
+   LIBGCC_PATH=$(otool -L "$BUNDLE_NAME/Contents/MacOS/ffmpeg" | awk '/libgcc_s/{print $1; exit}')
+fi
+if [[ -n "$LIBGCC_PATH" ]]; then
+   cp "$LIBGCC_PATH" "$BUNDLE_NAME/Contents/Frameworks/"
+fi
 
 fi # DEPLOYQT
 
@@ -173,4 +215,3 @@ echo "Submitting to notarytool"
 xcrun notarytool submit ${DMG_NAME} --apple-id ${APPLE_DEV_ID} --team-id ${APPLE_DEV_TEAM_ID} --password ${APPLE_DEV_PASSWORD} --wait
 echo "Stapling certificate"
 xcrun  stapler staple ${DMG_NAME}
-

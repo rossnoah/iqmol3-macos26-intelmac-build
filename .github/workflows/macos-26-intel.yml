@@ -1,0 +1,67 @@
+name: Build on macOS 26 Intel
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-project:
+    name: Build Project
+    runs-on: macos-26-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [Debug, Release]
+
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4.2.2
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          brew install qt@5 openssl@3 zstd boost gcc ninja
+
+      - name: Configure Build Environment
+        shell: bash
+        run: |
+          echo "QT_PREFIX=$(brew --prefix qt@5)" >> "$GITHUB_ENV"
+          echo "OPENSSL_PREFIX=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+          echo "ZSTD_PREFIX=$(brew --prefix zstd)" >> "$GITHUB_ENV"
+          echo "BOOST_PREFIX=$(brew --prefix boost)" >> "$GITHUB_ENV"
+          echo "FC=$(find "$(brew --prefix gcc)/bin" -maxdepth 1 -name 'gfortran-*' | head -n 1)" >> "$GITHUB_ENV"
+
+      - name: Configure Debug Project
+        if: ${{ matrix.type == 'Debug' }}
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0 \
+            -DCMAKE_PREFIX_PATH="$QT_PREFIX/lib/cmake;$OPENSSL_PREFIX;$ZSTD_PREFIX;$BOOST_PREFIX" \
+            -DOPENSSL_ROOT_DIR="$OPENSSL_PREFIX" \
+            -DZSTD_ROOT="$ZSTD_PREFIX" \
+            -DBoost_ROOT="$BOOST_PREFIX" \
+            -DCMAKE_Fortran_COMPILER="$FC"
+
+      - name: Configure Release Project
+        if: ${{ matrix.type == 'Release' }}
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0 \
+            -DCMAKE_PREFIX_PATH="$QT_PREFIX/lib/cmake;$OPENSSL_PREFIX;$ZSTD_PREFIX;$BOOST_PREFIX" \
+            -DOPENSSL_ROOT_DIR="$OPENSSL_PREFIX" \
+            -DZSTD_ROOT="$ZSTD_PREFIX" \
+            -DBoost_ROOT="$BOOST_PREFIX" \
+            -DCMAKE_Fortran_COMPILER="$FC"
+
+      - name: Build Project
+        run: |
+          cmake --build build --parallel 4
+
+      - name: Test Project
+        run: |
+          ctest --test-dir build --output-on-failure

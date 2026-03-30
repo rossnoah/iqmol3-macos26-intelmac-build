@@ -30,3 +30,38 @@ cd build
 make
 ```
 
+On macOS 26 on an Intel Mac, use Homebrew's `qt@5` and build explicitly for
+`x86_64`.  The `configure` script now auto-detects a Homebrew Qt 5 install from
+`/usr/local` on Intel Macs, but the fully explicit path is:
+
+```
+brew install qt@5 openssl@3 zstd boost gcc
+export IQMOL_QT_ROOT="$(brew --prefix qt@5)"
+export CMAKE_PREFIX_PATH="$IQMOL_QT_ROOT/lib/cmake"
+export MACOSX_DEPLOYMENT_TARGET=26.0
+./configure
+cd build
+make
+```
+
+For a direct CMake invocation on Intel macOS 26:
+
+```
+QT_PREFIX="$(brew --prefix qt@5)"
+OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+ZSTD_PREFIX="$(brew --prefix zstd)"
+BOOST_PREFIX="$(brew --prefix boost)"
+FC="$(find "$(brew --prefix gcc)/bin" -name 'gfortran-*' | head -n 1)"
+
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0 \
+  -DCMAKE_PREFIX_PATH="$QT_PREFIX/lib/cmake;$OPENSSL_PREFIX;$ZSTD_PREFIX;$BOOST_PREFIX" \
+  -DOPENSSL_ROOT_DIR="$OPENSSL_PREFIX" \
+  -DZSTD_ROOT="$ZSTD_PREFIX" \
+  -DBoost_ROOT="$BOOST_PREFIX" \
+  -DCMAKE_Fortran_COMPILER="$FC"
+
+cmake --build build
+```
